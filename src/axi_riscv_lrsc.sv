@@ -38,6 +38,8 @@ module axi_riscv_lrsc #(
     parameter int unsigned AXI_DATA_WIDTH = 0,
     parameter int unsigned AXI_ID_WIDTH = 0,
     parameter int unsigned AXI_USER_WIDTH = 0,
+    parameter int unsigned USE_CCU = 1,
+    parameter int unsigned NUM_CPUS = 2,
     /// Derived Parameters (do NOT change manually!)
     localparam int unsigned AXI_STRB_WIDTH = AXI_DATA_WIDTH / 8
 ) (
@@ -147,11 +149,16 @@ module axi_riscv_lrsc #(
     input  logic                        mst_b_valid_i
 );
 
+    localparam int unsigned CPU_ID_WIDTH = $clog2(NUM_CPUS);
+
     // Declarations of Signals and Types
 
-    logic [AXI_ID_WIDTH-1:0]        art_check_id,
-                                    art_set_id,
+    logic [AXI_ID_WIDTH-1:0]        art_check_id_tmp,
+                                    art_set_id_tmp,
                                     w_id_d,                     w_id_q;
+
+    logic [CPU_ID_WIDTH-1:0]        art_check_id,
+                                    art_set_id;
 
     logic [AXI_ADDR_WIDTH-1:0]      art_check_addr,
                                     art_clr_addr,
@@ -205,7 +212,7 @@ module axi_riscv_lrsc #(
         slv_r_valid_o   = 1'b0;
         slv_r_resp_o    = '0;
         art_set_addr    = '0;
-        art_set_id      = '0;
+        art_set_id_tmp  = '0;
         art_set_req     = 1'b0;
         rd_clr_addr     = '0;
         rd_clr_req      = 1'b0;
@@ -221,7 +228,7 @@ module axi_riscv_lrsc #(
                         // Inside exclusively-accessible address range and exclusive access and no
                         // burst
                         art_set_addr    = slv_ar_addr_i;
-                        art_set_id      = slv_ar_id_i;
+                        art_set_id_tmp  = slv_ar_id_i;
                         art_set_req     = 1'b1;
                         r_excl_d        = 1'b1;
                         if (art_set_gnt) begin
@@ -316,7 +323,7 @@ module axi_riscv_lrsc #(
         slv_b_id_o      = '0;
         slv_b_user_o    = '0;
         art_check_addr  = '0;
-        art_check_id    = '0;
+        art_check_id_tmp= '0;
         art_check_req   = 1'b0;
         wr_clr_addr     = '0;
         wr_clr_req      = 1'b0;
@@ -333,7 +340,7 @@ module axi_riscv_lrsc #(
                         if (slv_aw_lock_i && slv_aw_len_i == 8'h00) begin
                             // Exclusive access and no burst, so check if reservation exists
                             art_check_addr  = slv_aw_addr_i;
-                            art_check_id    = slv_aw_id_i;
+                            art_check_id_tmp= slv_aw_id_i;
                             art_check_req   = 1'b1;
                             if (art_check_gnt) begin
                                 if (art_check_res) begin
@@ -435,10 +442,15 @@ module axi_riscv_lrsc #(
         endcase
     end
 
+    assign art_set_id = art_set_id_tmp[AXI_ID_WIDTH-2 : AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-1] == NUM_CPUS ? art_set_id_tmp[AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-2 : 
+                        AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-$clog2(NUM_CPUS)-1]  : art_set_id_tmp[AXI_ID_WIDTH-3 : AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-1];
+    assign art_check_id = art_check_id_tmp[AXI_ID_WIDTH-2 : AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-1] == NUM_CPUS ? art_check_id_tmp[AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-2 : 
+                        AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-$clog2(NUM_CPUS)-1]  : art_check_id_tmp[AXI_ID_WIDTH-3 : AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-1];
+
     // AXI Reservation Table
     axi_res_tbl #(
         .AXI_ADDR_WIDTH (AXI_ADDR_WIDTH),
-        .AXI_ID_WIDTH   (AXI_ID_WIDTH)
+        .AXI_ID_WIDTH   (CPU_ID_WIDTH)
     ) i_art (
         .clk_i                  (clk_i),
         .rst_ni                 (rst_ni),
