@@ -442,10 +442,8 @@ module axi_riscv_lrsc #(
         endcase
     end
 
-    assign art_set_id = art_set_id_tmp[AXI_ID_WIDTH-2 : AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-1] == NUM_CPUS ? art_set_id_tmp[AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-2 : 
-                        AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-$clog2(NUM_CPUS)-1]  : art_set_id_tmp[AXI_ID_WIDTH-3 : AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-1];
-    assign art_check_id = art_check_id_tmp[AXI_ID_WIDTH-2 : AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-1] == NUM_CPUS ? art_check_id_tmp[AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-2 : 
-                        AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-$clog2(NUM_CPUS)-1]  : art_check_id_tmp[AXI_ID_WIDTH-3 : AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-1];
+    assign art_set_id = art_set_id_tmp[AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-2 : AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-$clog2(NUM_CPUS)-1];
+    assign art_check_id = art_check_id_tmp[AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-2 : AXI_ID_WIDTH-$clog2(NUM_CPUS+1)-$clog2(NUM_CPUS)-1];
 
     // AXI Reservation Table
     axi_res_tbl #(
