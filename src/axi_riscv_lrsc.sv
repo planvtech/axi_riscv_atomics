@@ -321,7 +321,7 @@ module axi_riscv_lrsc #(
 
         // increment w_addr each write
         if (slv_w_valid_i && slv_w_ready_o && wr_clr_gnt && aw_burst_q != 2'b00) begin
-            w_addr_d = w_addr_q + AXI_ADDR_WIDTH/8;
+            w_addr_d = w_addr_q + AXI_DATA_WIDTH/8;
         end
 
         if (slv_w_valid_i && slv_w_ready_o) begin
