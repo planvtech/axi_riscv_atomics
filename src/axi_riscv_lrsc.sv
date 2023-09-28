@@ -167,6 +167,8 @@ module axi_riscv_lrsc #(
                                     wr_clr_addr,
                                     w_addr_d,                   w_addr_q;
 
+    logic [1:0]                     aw_burst_d, aw_burst_q;
+
     logic                           art_check_req,              art_check_gnt,
                                     art_clr_req,                art_clr_gnt,
                                     art_set_req,                art_set_gnt,
@@ -176,7 +178,8 @@ module axi_riscv_lrsc #(
     logic                           art_check_res;
 
     logic                           b_excl_d,                   b_excl_q,
-                                    r_excl_d,                   r_excl_q;
+                                    r_excl_d,                   r_excl_q,
+                                    w_last_d,                   w_last_q;
 
     typedef enum logic [1:0]    {R_IDLE, R_WAIT_AR, R_WAIT_R} r_state_t;
     r_state_t                       r_state_d,                  r_state_q;
@@ -302,14 +305,30 @@ module axi_riscv_lrsc #(
     assign mst_w_user_o     = slv_w_user_i;
     assign mst_w_last_o     = slv_w_last_i;
 
+
     always_comb begin
-        w_addr_d    = w_addr_q;
-        w_id_d      = w_id_q;
+        w_addr_d        = w_addr_q;
+        w_last_d        = w_last_q;
+        aw_burst_d      = aw_burst_q;
+        w_id_d          = w_id_q;
+
+        // set w_addr and w_id
         if (slv_aw_valid_i && slv_aw_ready_o) begin
-            w_addr_d    = slv_aw_addr_i;
-            w_id_d      = slv_aw_id_i;
+            aw_burst_d = slv_aw_burst_i;
+            w_addr_d   = slv_aw_addr_i;
+            w_id_d     = slv_aw_id_i;
+        end
+
+        // increment w_addr each write
+        if (slv_w_valid_i && slv_w_ready_o && wr_clr_gnt && aw_burst_q != 2'b00) begin
+            w_addr_d = w_addr_q + AXI_ADDR_WIDTH/8;
+        end
+
+        if (slv_w_valid_i && slv_w_ready_o) begin
+            w_last_d = slv_w_last_i;
         end
     end
+
 
     // FSM for Time-Variant Signal Assignments
     always_comb begin
@@ -329,6 +348,7 @@ module axi_riscv_lrsc #(
         wr_clr_req      = 1'b0;
         b_excl_d        = b_excl_q;
         w_state_d       = w_state_q;
+
 
         case (w_state_q)
 
@@ -380,11 +400,13 @@ module axi_riscv_lrsc #(
             W_FORWARD: begin
                 mst_w_valid_o = slv_w_valid_i;
                 slv_w_ready_o = mst_w_ready_i;
-                if (slv_w_valid_i && slv_w_ready_o && slv_w_last_i) begin
+                if (slv_w_valid_i && slv_w_ready_o) begin
                     wr_clr_addr = w_addr_q;
                     wr_clr_req  = 1'b1;
                     if (wr_clr_gnt) begin
-                        w_state_d = B_FORWARD;
+                        if (slv_w_last_i) begin
+                            w_state_d = B_FORWARD;
+                        end
                     end else begin
                         w_state_d = W_WAIT_ART_CLR;
                     end
@@ -403,7 +425,10 @@ module axi_riscv_lrsc #(
                 wr_clr_addr = w_addr_q;
                 wr_clr_req  = 1'b1;
                 if (wr_clr_gnt) begin
-                    w_state_d = B_FORWARD;
+                    if (w_last_q)
+                        w_state_d = B_FORWARD;
+                    else
+                        w_state_d = W_FORWARD;
                 end
             end
 
@@ -490,6 +515,8 @@ module axi_riscv_lrsc #(
             w_addr_q    <= '0;
             w_id_q      <= '0;
             w_state_q   <= AW_IDLE;
+            aw_burst_q  <= '0;
+            w_last_q    <= 1'b0;
         end else begin
             b_excl_q    <= b_excl_d;
             r_excl_q    <= r_excl_d;
@@ -497,6 +524,8 @@ module axi_riscv_lrsc #(
             w_addr_q    <= w_addr_d;
             w_id_q      <= w_id_d;
             w_state_q   <= w_state_d;
+            aw_burst_q  <= aw_burst_d;
+            w_last_q    <= w_last_d;
         end
     end
 
